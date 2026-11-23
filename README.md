@@ -12,6 +12,11 @@ hyprdynamic looks at which monitors are connected, picks the first matching **se
 
 It re-evaluates on `monitor.added`, `monitor.removed`, `config.reloaded` and `hyprland.start`. Bursts of events, such as when a dock connects, are debounced into a single update. If nothing has changed, it does nothing.
 
+## Requirements
+
+- Hyprland with the Lua config API (`hyprland.lua`). Tested on **Hyprland 0.57.2**.
+- The Lua API is still evolving. On startup, hyprdynamic checks that every `hl.*` function it uses exists. If any are missing, it shows a warning listing them and disables itself instead of failing partway through. If that happens after a Hyprland update, please open an issue with your `hyprctl version` output.
+
 ## Install
 
 The repo is a Lua module: `init.lua` is the entry point, so `require("hyprdynamic")` works as long as the directory that *contains* `hyprdynamic/` is on `package.path` with an `?/init.lua` pattern.
