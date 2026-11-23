@@ -658,5 +658,19 @@ check("regex unsupported -> nil", rx("a{2}", "aa") == nil)
 
 check("range expand", table.concat(dm._internal.expand_workspaces({ 1, "3-5", "name:x" }), ",") == "1,3,4,5,name:x")
 
+do
+	check("api check: mock has full API", #dm._internal.missing_api() == 0)
+	local saved_rule, saved_move = hl.workspace_rule, hl.dsp.window.move
+	hl.workspace_rule, hl.dsp.window.move = nil, nil
+	local missing = table.concat(dm._internal.missing_api(), ",")
+	check("api check: reports missing functions", missing == "hl.workspace_rule,hl.dsp.window.move")
+	reset({ LAPTOP })
+	local ok = pcall(dm.config, { monitors = { laptop = { name = "eDP-1" } }, default = {} })
+	check("api check: config doesn't crash", ok)
+	check("api check: nothing applied", next(calls.monitor) == nil and dm._internal.state.config == nil)
+	check("api check: warns", #calls.notify > 0 and calls.notify[#calls.notify]:find("hl.workspace_rule", 1, true) ~= nil)
+	hl.workspace_rule, hl.dsp.window.move = saved_rule, saved_move
+end
+
 print(failures == 0 and "\nall passed" or ("\n" .. failures .. " failed"))
 os.exit(failures == 0 and 0 or 1)

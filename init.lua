@@ -109,11 +109,13 @@ local function notify(text, color)
 	if not (state.opts and state.opts.notify) then
 		return
 	end
-	pcall(hl.notification.create, {
-		text = "hyprdynamic: " .. text,
-		timeout = state.opts.notify_timeout,
-		color = color,
-	})
+	pcall(function()
+		hl.notification.create({
+			text = "hyprdynamic: " .. text,
+			timeout = state.opts.notify_timeout,
+			color = color,
+		})
+	end)
 end
 
 local function warn(fmt, ...)
@@ -121,11 +123,13 @@ local function warn(fmt, ...)
 	print("[hyprdynamic] WARNING: " .. msg)
 	write_log_file("WARNING: " .. msg)
 	if state.opts and state.opts.notify then
-		pcall(hl.notification.create, {
-			text = "hyprdynamic: " .. msg,
-			timeout = 8000,
-			color = "rgba(ff5555ff)",
-		})
+		pcall(function()
+			hl.notification.create({
+				text = "hyprdynamic: " .. msg,
+				timeout = 8000,
+				color = "rgba(ff5555ff)",
+			})
+		end)
 	end
 end
 
@@ -1349,9 +1353,59 @@ end
 -- public API
 ---------------------------------------------------------------------------
 
+-- Hyprland Lua API functions hyprdynamic needs. Tested on Hyprland 0.57.2.
+local required_api = {
+	"on",
+	"timer",
+	"monitor",
+	"workspace_rule",
+	"window_rule",
+	"dispatch",
+	"dsp.focus",
+	"dsp.window.move",
+	"dsp.workspace.move",
+	"get_monitors",
+	"get_workspaces",
+	"get_windows",
+	"get_active_workspace",
+	"notification.create",
+}
+
+-- Returns the list of required `hl.*` functions that are missing (empty if all exist).
+-- Fields are looked up with pcall: Hyprland objects may be userdata whose __index errors.
+local function missing_api()
+	local missing = {}
+	for _, path in ipairs(required_api) do
+		local ok, v = pcall(function()
+			local cur = hl
+			for part in path:gmatch("[^.]+") do
+				if cur == nil then
+					return nil
+				end
+				cur = cur[part]
+			end
+			return cur
+		end)
+		if not ok or v == nil then
+			missing[#missing + 1] = "hl." .. path
+		end
+	end
+	return missing
+end
+
 function M.config(cfg)
 	cfg = cfg or {}
 	state.opts = merge(defaults, cfg.options)
+
+	local missing = missing_api()
+	if #missing > 0 then
+		warn(
+			"this Hyprland lacks required Lua API (%s); hyprdynamic is disabled. Tested on Hyprland 0.57.2",
+			table.concat(missing, ", ")
+		)
+		state.config = nil
+		return M
+	end
 
 	local errors = validate(cfg)
 	for _, e in ipairs(errors) do
@@ -1446,7 +1500,7 @@ function M.status()
 	return table.concat(lines, "\n")
 end
 
-M._internal = { expand_workspaces = expand_workspaces, regex_match = regex_match, state = state }
+M._internal = { missing_api = missing_api, expand_workspaces = expand_workspaces, regex_match = regex_match, state = state }
 
 -- alias
 M.setup = M.config
